@@ -1,0 +1,87 @@
+// conversion word to int
+function word2int(val) {
+    var rc = val;
+    if ( val >= 32767)  {
+        rc = (65535 -  val)* (-1) ; 
+    }
+    return rc;
+}
+
+function int16Normalize(val) {
+     var rc = val;
+    // discharging ? 65534
+    if (val >= 3276)  { 
+        rc = ( 6553 - val)* (-1)
+    }
+    rc =  Math.round(rc * 10) / 10
+    return rc;
+}
+
+// Read Input Register, Function code 4
+var mappedArray = msg.payload ; 
+
+// solar panel - data
+var string1Voltage =    { payload: mappedArray[0x0003]/10 , topic: "solax/string1V"};           // 0.1V uint16
+var string2Voltage =    { payload: mappedArray[0x0004]/10 , topic: "solax/string2V"};           // 0.1V uint16
+var string1Current =    { payload: mappedArray[0x0005]/10,  topic: "solax/string1A"};           // 0.1A uint16
+var string2Current =    { payload: mappedArray[0x0006]/10,  topic: "solax/string2A"};           // 0.1A uint16    
+var string1Power =      { payload: mappedArray[0x000A], topic: "solax/string1W" };              //power DC 1  - 1W uint16
+var string2Power =      { payload: mappedArray[0x000B], topic: "solax/string2W" };              //power DC 2  - 1W uint16
+var stringsPowerValue = mappedArray[0x000A] + mappedArray[0x000B];
+var stringsPower  =     { payload: stringsPowerValue, topic: "solax/stringsW" };                //SUM 
+
+// Power to the grid / from grid
+// + delivery to a distribution grid
+// - consumption from the grid 
+var powerToGridValue = word2int(mappedArray[0x0046]);
+var powerToGrid  =  { payload: powerToGridValue, topic: "solax/powerToGrid" };     // feed in power meter  1W  Int32
+
+// inverter power
+var gridPowerR  =  { payload: word2int(mappedArray[0x006C]), topic: "solax/gridPowerR" };                 // 1W  int16
+var gridPowerS  =  { payload: word2int(mappedArray[0x0070]), topic: "solax/gridPowerS" };                 // 1W  int16
+var gridPowerT =  { payload: word2int(mappedArray[0x0074]), topic: "solax/gridPowerT" };                  // 1W  int16
+var gridPowerSumValue = word2int(mappedArray[0x006C]) +  word2int(mappedArray[0x0070]) +  word2int(mappedArray[0x0074]);
+var gridPowerSum = { payload: gridPowerSumValue, topic: "solax/gridPower" }; 
+
+var homeConsumptionValue = gridPowerSumValue - powerToGridValue;
+var homeConsumption = { payload: homeConsumptionValue, topic: "solax/homeConsuptionW" }; 
+
+// kwh
+var energyToday = { payload: mappedArray[0x0050]/10, topic: "solax/energyToday" }; //energy today 0.1 kwh unit16
+
+var reservePowerValue = stringsPowerValue - homeConsumptionValue /*gridPowerSumValue - powerToGridValue*/;
+var reservePower = { payload: reservePowerValue, topic: "solax/reservePower" }; 
+
+
+// temperature - inverter
+var inverterTemperature  =     { payload: mappedArray[0x008], topic: "solax/iverterTemp" };  // 1C int16
+var inverterFaultTemperature  =     { payload: mappedArray[0x00C], topic: "solax/iverterFaultTemp" }; //  1C int16
+var radiatorTemperature  =     { payload: mappedArray[0x00BE], topic: "solax/radiatorTemperatur" }; 
+
+
+// battery
+var batteryTemperature  =     { payload: mappedArray[0x0018], topic: "solax/battery/temp" };
+var battVoltage =  { payload: mappedArray[0x0014]/10, topic: "solax/battery/V" };            //0.1V int16
+var battCurrent =  { payload: int16Normalize(mappedArray[0x0015]/10), topic: "solax/battery/A" }; // 0.1A  int16
+var battPower = { payload: word2int(mappedArray[0x0016]), topic: "solax/battery/W" };           
+var batteryCapacity =   { payload: mappedArray[0x001C], topic: "solax/battery/Percent" };
+
+
+
+return [
+        string1Voltage, 
+        string2Voltage,
+        string1Current,
+        string2Current,
+        string1Power,
+        string2Power,
+        stringsPower,
+        powerToGrid,
+        gridPowerR, gridPowerS, gridPowerT, gridPowerSum,
+        batteryCapacity,battPower,battCurrent,battVoltage,batteryTemperature,
+        inverterTemperature,
+        energyToday,
+        homeConsumption,
+        reservePower
+    ]
+
